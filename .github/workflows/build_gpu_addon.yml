@@ -22,7 +22,7 @@ jobs:
 
     steps:
       # -------------------------------------------------------------- Checkout
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # -------------------------------------------------------------- Set versions + convert CUDA
       - name: Set versions
@@ -102,7 +102,7 @@ jobs:
 
       # -------------------------------------------------------------- Upload artifacts
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cuda-addon-${{ matrix.config }}-torch${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
           path: Output/*.exe
