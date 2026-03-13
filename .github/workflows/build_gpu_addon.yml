@@ -92,7 +92,7 @@ jobs:
 
       # -------------------------------------------------------------- Compile installer
       - name: Compile installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.6
         with:
           path: cuda_addon_setup.iss
           options: >

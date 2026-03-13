@@ -12,7 +12,9 @@
 #endif
 #define Publisher  "a7brusco"
 
-#define Configuration GetStringParam("Configuration", "release")
+#ifndef Configuration
+#define Configuration "release"
+#endif
 #define DllDir "dlls_" + Configuration
 
 [Setup]
