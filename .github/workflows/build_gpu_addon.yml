@@ -89,6 +89,14 @@ jobs:
               }
           }
           $zip.Dispose()
+      
+      - name: Check dlls folder
+        shell: pwsh
+        run: |
+          $config = "${{ matrix.config }}"
+          Write-Host "Looking for: dlls_$config"
+          Get-ChildItem "dlls_$config" -ErrorAction SilentlyContinue
+          Get-ChildItem . | Select-Object Name
 
       # -------------------------------------------------------------- Compile installer
       - name: Compile installer
