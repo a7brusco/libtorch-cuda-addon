@@ -24,21 +24,14 @@ jobs:
       # -------------------------------------------------------------- Checkout
       - uses: actions/checkout@v4
 
-      # -------------------------------------------------------------- Set versions + convert CUDA
+      # -------------------------------------------------------------- Set versions
       - name: Set versions
         shell: bash
         run: |
-          # Torch version
-          echo "TORCH_VERSION=${{ github.event.inputs.torch_version }}" >> $GITHUB_ENV
-          
-          # Convert CUDA version: 13.0 -> 130
           CUDA_INPUT="${{ github.event.inputs.cuda_version }}"
           CUDA_NUMBER="${CUDA_INPUT//./}"
+          echo "TORCH_VERSION=${{ github.event.inputs.torch_version }}" >> $GITHUB_ENV
           echo "CUDA_VERSION=$CUDA_NUMBER" >> $GITHUB_ENV
-          
-          echo "Torch version: $TORCH_VERSION"
-          echo "CUDA input: $CUDA_INPUT, converted: $CUDA_NUMBER"
-          echo "Build config: ${{ matrix.config }}"
 
       # -------------------------------------------------------------- Download libtorch
       - name: Download libtorch
@@ -46,14 +39,11 @@ jobs:
         run: |
           if [ "${{ matrix.config }}" = "debug" ]; then
             URL="https://download.pytorch.org/libtorch/cu${CUDA_VERSION}/libtorch-win-shared-with-deps-debug-${TORCH_VERSION}%2Bcu${CUDA_VERSION}.zip"
-            OUT="libtorch-debug.zip"
           else
             URL="https://download.pytorch.org/libtorch/cu${CUDA_VERSION}/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu${CUDA_VERSION}.zip"
-            OUT="libtorch-release.zip"
           fi
-
           echo "Downloading $URL ..."
-          curl -L "$URL" -o "$OUT"
+          curl -L "$URL" -o libtorch.zip
 
       # -------------------------------------------------------------- Extract DLLs
       - name: Extract DLLs
@@ -72,38 +62,31 @@ jobs:
             "nvJitLink_130_0.dll"
           )
 
-          $config = "${{ matrix.config }}"
-          $zipfile = "libtorch-$config.zip"
-          $outdir = "dlls_$config"
-
+          $outdir = "dlls_${{ matrix.config }}"
           New-Item -ItemType Directory -Force -Path $outdir | Out-Null
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipfile)
+          $zip = [System.IO.Compression.ZipFile]::OpenRead("libtorch.zip")
 
           foreach ($entry in $zip.Entries) {
-              $filename = [System.IO.Path]::GetFileName($entry.FullName)
-              if ($dlls -contains $filename) {
-                  $dest = "$outdir\$filename"
-                  [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
-                  Write-Host "Extracted: $filename"
-              }
+            $filename = [System.IO.Path]::GetFileName($entry.FullName)
+            if ($dlls -contains $filename) {
+              [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$outdir\$filename", $true)
+              Write-Host "Extracted: $filename"
+            }
           }
           $zip.Dispose()
 
-      # -------------------------------------------------------------- Compile installer
+      # -------------------------------------------------------------- Compile installer (NSIS is preinstalled on windows-latest)
       - name: Compile installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
-        with:
-          path: cuda_addon_setup.iss
-          options: |
-            /O+
-            /DAppVersion=${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
-            /DConfiguration=${{ matrix.config }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path Output | Out-Null
+          makensis /DVERSION="${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}" /DCONFIG=${{ matrix.config }} cuda_addon_setup.nsi
 
-      # -------------------------------------------------------------- Upload artifacts
+      # -------------------------------------------------------------- Upload artifact
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: cuda-addon-${{ matrix.config }}-torch${TORCH_VERSION}-cu${CUDA_VERSION}
-          path: Output/*.exe
+          name: cuda-addon-${{ matrix.config }}-${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
+          path: Output/cuda_addon_setup_${{ matrix.config }}.exe
           retention-days: 30
