@@ -16,9 +16,6 @@
 
 #define DllDir "dlls_" + Configuration
 
-#pragma message "DllDir = " + DllDir
-#pragma message "Configuration = " + Configuration
-
 [Setup]
 AppName=LibTorch GPU Addon
 AppVersion={#AppVersion}
