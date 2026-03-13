@@ -1,9 +1,16 @@
 name: Build GPU Addon Installer
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      torch_version:
+        description: "LibTorch version"
+        required: true
+        default: "2.9.1"
+      cuda_version:
+        description: "CUDA version (ex: 13.0)"
+        required: true
+        default: "13.0"
 
 jobs:
   build-addon:
@@ -14,32 +21,41 @@ jobs:
         config: [release, debug]
 
     steps:
-      # ------------------------------------------------------------------ Config
+      # -------------------------------------------------------------- Checkout
+      - uses: actions/checkout@v4
+
+      # -------------------------------------------------------------- Set versions + convert CUDA
       - name: Set versions
         shell: bash
         run: |
-          echo "TORCH_VERSION=2.9.1" >> $GITHUB_ENV
-          echo "CUDA_VERSION=130" >> $GITHUB_ENV
-          echo "CONFIG=${{ matrix.config }}" >> $GITHUB_ENV
+          # Torch version
+          echo "TORCH_VERSION=${{ github.event.inputs.torch_version }}" >> $GITHUB_ENV
+          
+          # Convert CUDA version: 13.0 -> 130
+          CUDA_INPUT="${{ github.event.inputs.cuda_version }}"
+          CUDA_NUMBER="${CUDA_INPUT//./}"
+          echo "CUDA_VERSION=$CUDA_NUMBER" >> $GITHUB_ENV
+          
+          echo "Torch version: $TORCH_VERSION"
+          echo "CUDA input: $CUDA_INPUT, converted: $CUDA_NUMBER"
+          echo "Build config: ${{ matrix.config }}"
 
-      # ------------------------------------------------------------------ Checkout
-      - uses: actions/checkout@v4
-
-      # ------------------------------------------------------------------ Download libtorch
+      # -------------------------------------------------------------- Download libtorch
       - name: Download libtorch
         shell: bash
         run: |
           if [ "${{ matrix.config }}" = "debug" ]; then
-            URL="https://download.pytorch.org/libtorch/cu${{ env.CUDA_VERSION }}/libtorch-win-shared-with-deps-debug-${{ env.TORCH_VERSION }}%2Bcu${{ env.CUDA_VERSION }}.zip"
+            URL="https://download.pytorch.org/libtorch/cu${CUDA_VERSION}/libtorch-win-shared-with-deps-debug-${TORCH_VERSION}%2Bcu${CUDA_VERSION}.zip"
             OUT="libtorch-debug.zip"
           else
-            URL="https://download.pytorch.org/libtorch/cu${{ env.CUDA_VERSION }}/libtorch-win-shared-with-deps-${{ env.TORCH_VERSION }}%2Bcu${{ env.CUDA_VERSION }}.zip"
+            URL="https://download.pytorch.org/libtorch/cu${CUDA_VERSION}/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu${CUDA_VERSION}.zip"
             OUT="libtorch-release.zip"
           fi
 
+          echo "Downloading $URL ..."
           curl -L "$URL" -o "$OUT"
 
-      # ------------------------------------------------------------------ Extract DLLs
+      # -------------------------------------------------------------- Extract DLLs
       - name: Extract DLLs
         shell: pwsh
         run: |
@@ -61,32 +77,32 @@ jobs:
           $outdir = "dlls_$config"
 
           New-Item -ItemType Directory -Force -Path $outdir | Out-Null
-
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead($zipfile)
 
           foreach ($entry in $zip.Entries) {
-            $filename = [System.IO.Path]::GetFileName($entry.FullName)
-            if ($dlls -contains $filename) {
-              $dest = "$outdir\$filename"
-              [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
-              Write-Host "Extracted: $filename"
-            }
+              $filename = [System.IO.Path]::GetFileName($entry.FullName)
+              if ($dlls -contains $filename) {
+                  $dest = "$outdir\$filename"
+                  [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
+                  Write-Host "Extracted: $filename"
+              }
           }
-
           $zip.Dispose()
 
-      # ------------------------------------------------------------------ Compile installer
+      # -------------------------------------------------------------- Compile installer
       - name: Compile installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: cuda_addon_setup.iss
-          options: /DAppVersion=${{ github.ref_name }} /DConfiguration=${{ matrix.config }}
+          options: >
+            /DAppVersion=${TORCH_VERSION}-cu${CUDA_VERSION}
+            /DConfiguration=${{ matrix.config }}
 
-      # ------------------------------------------------------------------ Upload artifact
+      # -------------------------------------------------------------- Upload artifacts
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: cuda-addon-${{ matrix.config }}-${{ github.ref_name }}
+          name: cuda-addon-${{ matrix.config }}-torch${TORCH_VERSION}-cu${CUDA_VERSION}
           path: Output/*.exe
           retention-days: 30
