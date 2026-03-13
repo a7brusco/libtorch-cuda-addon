@@ -96,7 +96,7 @@ jobs:
         with:
           path: cuda_addon_setup.iss
           options: >
-            /DAppVersion=${TORCH_VERSION}-cu${CUDA_VERSION}
+            /DAppVersion="${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}"
             /DConfiguration=${{ matrix.config }}
 
       # -------------------------------------------------------------- Upload artifacts

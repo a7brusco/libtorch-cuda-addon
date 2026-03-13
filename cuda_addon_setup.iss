@@ -6,22 +6,21 @@
 ;
 ; Built by GitHub Actions, signed by TeamCity before distribution.
 
-#define AppName    "LibTorch GPU Addon"
 #ifndef AppVersion
 #define AppVersion "dev"
 #endif
-#define Publisher  "a7brusco"
 
 #ifndef Configuration
 #define Configuration "release"
 #endif
+
 #define DllDir "dlls_" + Configuration
 
 [Setup]
-AppName={#AppName}
+AppName=LibTorch GPU Addon
 AppVersion={#AppVersion}
-AppPublisher={#Publisher}
-DefaultDirName={autopf}\{#AppName}
+AppPublisher=a7brusco
+DefaultDirName={autopf}\LibTorch GPU Addon
 DisableDirPage=no
 DisableProgramGroupPage=yes
 OutputBaseFilename=cuda_addon_setup_{#Configuration}
