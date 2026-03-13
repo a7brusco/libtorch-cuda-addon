@@ -1,0 +1,92 @@
+name: Build GPU Addon Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-addon:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        config: [release, debug]
+
+    steps:
+      # ------------------------------------------------------------------ Config
+      - name: Set versions
+        shell: bash
+        run: |
+          echo "TORCH_VERSION=2.9.1" >> $GITHUB_ENV
+          echo "CUDA_VERSION=130" >> $GITHUB_ENV
+          echo "CONFIG=${{ matrix.config }}" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------------ Checkout
+      - uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------ Download libtorch
+      - name: Download libtorch
+        shell: bash
+        run: |
+          if [ "${{ matrix.config }}" = "debug" ]; then
+            URL="https://download.pytorch.org/libtorch/cu${{ env.CUDA_VERSION }}/libtorch-win-shared-with-deps-debug-${{ env.TORCH_VERSION }}%2Bcu${{ env.CUDA_VERSION }}.zip"
+            OUT="libtorch-debug.zip"
+          else
+            URL="https://download.pytorch.org/libtorch/cu${{ env.CUDA_VERSION }}/libtorch-win-shared-with-deps-${{ env.TORCH_VERSION }}%2Bcu${{ env.CUDA_VERSION }}.zip"
+            OUT="libtorch-release.zip"
+          fi
+
+          curl -L "$URL" -o "$OUT"
+
+      # ------------------------------------------------------------------ Extract DLLs
+      - name: Extract DLLs
+        shell: pwsh
+        run: |
+          $dlls = @(
+            "torch_cuda.dll",
+            "cupti64_2025.3.0.dll",
+            "c10_cuda.dll",
+            "cublas64_13.dll",
+            "cublasLt64_13.dll",
+            "cudnn64_9.dll",
+            "cufft64_12.dll",
+            "cusolver64_12.dll",
+            "cusparse64_12.dll",
+            "nvJitLink_130_0.dll"
+          )
+
+          $config = "${{ matrix.config }}"
+          $zipfile = "libtorch-$config.zip"
+          $outdir = "dlls_$config"
+
+          New-Item -ItemType Directory -Force -Path $outdir | Out-Null
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipfile)
+
+          foreach ($entry in $zip.Entries) {
+            $filename = [System.IO.Path]::GetFileName($entry.FullName)
+            if ($dlls -contains $filename) {
+              $dest = "$outdir\$filename"
+              [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
+              Write-Host "Extracted: $filename"
+            }
+          }
+
+          $zip.Dispose()
+
+      # ------------------------------------------------------------------ Compile installer
+      - name: Compile installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: cuda_addon_setup.iss
+          options: /DAppVersion=${{ github.ref_name }} /DConfiguration=${{ matrix.config }}
+
+      # ------------------------------------------------------------------ Upload artifact
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuda-addon-${{ matrix.config }}-${{ github.ref_name }}
+          path: Output/*.exe
+          retention-days: 30
