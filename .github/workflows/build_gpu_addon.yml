@@ -66,6 +66,10 @@ jobs:
             "cublas64_13.dll",
             "cublasLt64_13.dll",
             "cudnn64_9.dll",
+            "cudnn_heuristic64_9.dll",
+            "cudnn_graph64_9.dll",
+            "cudnn_engines_runtime_compiled64_9.dll",
+            "cudnn_engines_precompiled64_9.dll",
             "cufft64_12.dll",
             "cusolver64_12.dll",
             "cusparse64_12.dll",
@@ -89,6 +93,14 @@ jobs:
               }
           }
           $zip.Dispose()
+      
+      # -------------------------------------------------------------- Upload zip
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: cuda-zip-${{ matrix.config }}-torch${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
+          path: Output/*.zpi
+          retention-days: 30
 
       # -------------------------------------------------------------- Compile installer
       - name: Compile installer
@@ -100,7 +112,7 @@ jobs:
             /DAppVersion=${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
             /DConfiguration=${{ matrix.config }}
 
-      # -------------------------------------------------------------- Upload artifacts
+      # -------------------------------------------------------------- Upload addons
       - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
