@@ -93,14 +93,6 @@ jobs:
               }
           }
           $zip.Dispose()
-      
-      # -------------------------------------------------------------- Upload zip
-      - name: Upload installer
-        uses: actions/upload-artifact@v7
-        with:
-          name: cuda-zip-${{ matrix.config }}-torch${{ env.TORCH_VERSION }}-cu${{ env.CUDA_VERSION }}
-          path: Output/*.zpi
-          retention-days: 30
 
       # -------------------------------------------------------------- Compile installer
       - name: Compile installer
